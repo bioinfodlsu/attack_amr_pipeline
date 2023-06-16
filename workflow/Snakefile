@@ -1,0 +1,748 @@
+# This defines the input files for each sample using glob_wildcards.
+# The input files are located in the "data" directory and have the pattern:
+# 	{sample}_R1_001.fastq.gz
+# The pattern is used to extract the sample name and store it in the "SAMPLES" variable.
+
+# ***Choose only one!***
+# a.) Uncomment if using raw data instead of trimmed data
+(SAMPLES,) = glob_wildcards("data/{sample}_R1_001.fastq.gz")
+# b.) Uncomment to use for downsampling or if raw data files are already deleted
+#(SAMPLES,) = glob_wildcards("trimmed_data/{sample}_R1_trimmed.fastq.gz")
+
+# This defines the output files for the pipeline.
+rule all:
+	input:
+		# Uncomment if using raw data instead of trimmed data
+		expand("data/FASTQC/{sample}_{read}_001_fastqc.zip", sample=SAMPLES, read=["R1", "R2"]),
+		"data/multiqc_report.html",
+		expand("trimmed_data/{sample}_{read}_trimmed.fastq.gz", sample=SAMPLES,	read=["R1", "R2"]),
+		expand("trimmed_data/FASTQC/{sample}_{read}_trimmed_fastqc.zip", sample=SAMPLES, read=["R1", "R2"]),
+		"trimmed_data/multiqc_report.html",
+		# ***Choose only one of either Resfinder or CARD AMR database!***
+		# a.) Uncomment if using Resfinder database
+		"resfinder_db/resfinder.1.bt2",
+		expand("mapped_reads_resfinder/{sample}_unfiltered.bam", sample=SAMPLES),
+		expand("logs/resfinder/{sample}.log", sample=SAMPLES),
+		expand("mapped_reads_resfinder/{sample}.bam", sample=SAMPLES),
+		expand("sorted_reads_resfinder/{sample}.bam.bai", sample=SAMPLES),
+		"resfinder_out/gene_names",
+		"resfinder_out/ARG_genemat.txt",
+		# b.) Uncomment 7 lines below if using CARD database
+		#"card_db/card.1.bt2",
+		#expand("mapped_reads_card/{sample}_unfiltered.bam", sample=SAMPLES),
+		#expand("logs/card/{sample}.log", sample=SAMPLES),
+		#expand("mapped_reads_card/{sample}.bam", sample=SAMPLES),
+		#expand("sorted_reads_card/{sample}.bam.bai", sample=SAMPLES),
+		#"card_out/gene_names",
+		#"card_out/ARG_genemat.txt",
+		# Uncomment to run MGE database
+		"MGE_db/MGE.1.bt2",
+		expand("mapped_reads_MGE/{sample}_unfiltered.bam", sample=SAMPLES),
+		expand("logs/MGE/{sample}.log", sample=SAMPLES),
+		expand("mapped_reads_MGE/{sample}.bam", sample=SAMPLES),
+		expand("sorted_reads_MGE/{sample}.bam.bai", sample=SAMPLES),
+		"MGE_out/gene_names",
+		"MGE_out/MGE_genemat.txt",
+		# Uncomment to run metaphlan
+		expand("metaphlan3/{sample}_profile.txt", sample=SAMPLES),
+		"metaphlan3/merged_abundance_table.txt",
+		# Uncomment to run metaxa
+		#expand("metaxa2/{sample}.level_6.txt", sample=SAMPLES),
+		#"metaxa2/metaxa_genus.txt"
+
+# ***DO NOT UNCOMMENT! For downsampling sequence data only!***
+# rule all:
+# 	input:
+# 		expand("trimmed_data/z{sample}_R1_trimmed.fastq.gz", sample=SAMPLES),
+# 		expand("trimmed_data/z{sample}_R2_trimmed.fastq.gz", sample=SAMPLES)
+
+# This runs FastQC, a tool for performing quality control (QC) on raw sequencing data.
+# 	--quiet: This suppresses some of the verbose output that FastQC normally produces.
+#	-t {threads}: This specifies the number of threads to use for the analysis.
+#	--outdir data/FASTQC: This specifies the output directory for the FastQC output files.
+#	-f fastq: This specifies the file format of the input file.
+#	{input}: This specifies the input file for FastQC to perform QC on.
+rule fastqc_raw:
+	input:
+		"data/{sample}_{read}_001.fastq.gz",
+	output:
+		"data/FASTQC/{sample}_{read}_001_fastqc.zip",
+	message:
+		"-- Quality check of raw data with Fastqc --"
+	conda:
+		"envs/fastqc.yml"
+	threads: 20
+	shell:
+		"fastqc --quiet -t {threads} --outdir data/FASTQC -f fastq {input}"
+
+# This runs MultiQC to analyze the contents of the "data" directory and generate an interactive HTML report with charts and plots.
+# 	-f: This tells MultiQC to overwrite any existing output files.
+#	--interactive: This enables interactive charts and plots in the HTML report.
+#	--quiet: This suppresses normal status messages and warnings, making the output less verbose.
+#	data/: This is the input directory that MultiQC will analyze.
+#	-o data/: This specifies the output directory for MultiQC's results.
+rule multiqc_raw:
+	input:
+		expand(
+			"data/FASTQC/{sample}_{read}_001_fastqc.zip",
+			sample=SAMPLES,
+			read=["R1", "R2"],
+		),
+	output:
+		"data/multiqc_report.html",
+	message:
+		"-- Running MultiQC for raw data --"
+	conda:
+		"envs/multiqc.yml"
+	threads: 20
+	shell:
+		"multiqc -f --interactive --quiet data/ -o data/"
+
+# This runs Cutadapt to process the input forward and reverse reads, remove the specified adapter sequences, discard any reads that are too short or low quality.
+#	-a CTGTCTCTTATACACATCT: This specifies the adapter sequence to be removed from the 5' end of the forward read.
+#	-A CTGTCTCTTATACACATCT: This specifies the adapter sequence to be removed from the 5' end of the reverse read.
+#	-O 10: This specifies the minimum overlap required between the adapter and the read to be considered a match.
+#	-m 30: This specifies the minimum length of the read to be retained after adapter removal. Any reads shorter than this will be discarded.
+#	-q 20: This specifies the minimum quality score required for the read to be retained after adapter removal. Any reads with a quality score lower than this will be discarded.
+#	{input.fw}, {input.rv}: These are the input filenames of the forward and reverse reads, respectively.
+#	-o {output.fw}: This specifies the output filename for the processed forward reads.
+#	-p {output.rv}: This specifies the output filename for the processed reverse reads.
+#	> {output.log}: This redirects the standard output to a log file named "{output.log}" in the current working directory.
+rule cutadapt:
+	input:
+		fw="data/{sample}_R1_001.fastq.gz",
+		rv="data/{sample}_R2_001.fastq.gz"
+	output:
+		fw="trimmed_data/{sample}_R1_trimmed.fastq.gz",
+		rv="trimmed_data/{sample}_R2_trimmed.fastq.gz",
+		log="trimmed_data/{sample}.trimmed.txt"
+	message:
+		"-- Running Cutadapt --"
+	conda:
+		"envs/cutadapt.yml"
+	threads: 20
+	shell:
+		"cutadapt -a CTGTCTCTTATACACATCT -A CTGTCTCTTATACACATCT -O 10 -m 30 -q 20 {input.fw} {input.rv} -o {output.fw} -p {output.rv} > {output.log}"
+
+# ***This is for downsampling sequence data only!***
+rule downsample_R1:
+	input:
+		read1="trimmed_data/{sample}_R1_trimmed.fastq.gz",
+	output:
+		read1="trimmed_data/z{sample}_R1_trimmed.fastq.gz",
+	message:
+		"-- Downsampling Trimmed Data for R1 --"
+	conda:
+		"envs/downsample.yml"
+	threads:
+		1
+	shell: # 12518768 = 10% of #lines of BFH1
+		"zcat -c {input.read1} | head -n 12518768 | gzip - > {output.read1} || true"
+
+# ***This is for downsampling sequence data only!***
+rule downsample_R2:
+	input:
+		read2="trimmed_data/{sample}_R2_trimmed.fastq.gz",
+	output:
+		read2="trimmed_data/z{sample}_R2_trimmed.fastq.gz",
+	message:
+		"-- Downsampling Trimmed Data for R2 --"
+	conda:
+		"envs/downsample.yml"
+	threads: 1
+	shell: # 12518768 = 10% of #lines of BFH1
+		"zcat -c {input.read2} | head -n 12518768 | gzip - > {output.read2} || true"
+
+# This runs FastQC, a tool for performing quality control (QC) on trimmed sequencing data.
+# 	--quiet: This suppresses some of the verbose output that FastQC normally produces.
+#	-t {threads}: This specifies the number of threads to use for the analysis.
+#	--outdir data/FASTQC: This specifies the output directory for the FastQC output files.
+#	-f fastq: This specifies the file format of the input file.
+#	{input}: This specifies the input file for FastQC to perform QC on.
+rule fastqc_trim:
+	input:
+		"trimmed_data/{sample}_{read}_trimmed.fastq.gz",
+	output:
+		"trimmed_data/FASTQC/{sample}_{read}_trimmed_fastqc.zip",
+	message:
+		"-- Quality check of trimmed data with Fastqc --"
+	conda:
+		"envs/fastqc.yml"
+	threads: 20
+	shell:
+		"fastqc --quiet -t {threads} --outdir trimmed_data/FASTQC -f fastq {input}"
+
+# This runs MultiQC to analyze the contents of the "trimmed_data" directory and generate an interactive HTML report with charts and plots.
+# 	-f: This tells MultiQC to overwrite any existing output files.
+#	--interactive: This enables interactive charts and plots in the HTML report.
+#	--quiet: This suppresses normal status messages and warnings, making the output less verbose.
+#	data/: This is the input directory that MultiQC will analyze.
+#	-o data/: This specifies the output directory for MultiQC's results.
+rule multiqc_trim:
+	input:
+		expand(
+			"trimmed_data/FASTQC/{sample}_{read}_trimmed_fastqc.zip",
+			sample=SAMPLES,
+			read=["R1", "R2"],
+		),
+	output:
+		"trimmed_data/multiqc_report.html",
+	message:
+		"-- Running MultiQC for trimmed data--"
+	conda:
+		"envs/multiqc.yml"
+	threads: 20
+	shell:
+		"multiqc -f --interactive --quiet trimmed_data/ -o trimmed_data/"
+
+# -------------------------- Start of Resfinder Database ----------------------------#
+
+# This creates a Bowtie2 index for a reference genome in FASTA format using the Bowtie2-build program, 
+# and saves the resulting index files in the resfinder_db/resfinder directory with the prefix resfinder. 
+rule resfinder_db:
+	input:
+		fasta="resfinder_db/resfinder.fasta"
+	output:
+		indexed_db="resfinder_db/resfinder.1.bt2"
+	message:
+		"-- Creating ResFinder database --"	 
+	conda:
+		"envs/bowtie2.yml"
+	threads: 20
+	shell:
+		"bowtie2-build {input.fasta} resfinder_db/resfinder"
+
+# This runs the Bowtie2 aligner on paired-end reads specified by {input.fw} and {input.rv} variables, using the reference index resfinder_db/resfinder (-x flag), with a specified number of threads (-p flag), and other options:
+#	-D 20: This sets the maximum number of seed extension attempts to 20.
+#	-R 3: This sets the maximum number of times Bowtie2 will retry a read pair before giving up to 3.
+#	-N 1: This sets the number of mismatches allowed in the seed alignment to 1.
+#	-L 20: This sets the length of the seed substring to 20.
+#	-i S,1,0.50: This sets the seed length to 1 base and the seed interval to 0.5 of the length of the seed substring.
+# The samtools view command converts the SAM input from standard input to BAM format, and save the resulting BAM file to the filename specified by the "{output}" parameter.
+#	-Sb: This specifies the output format as BAM. This option also requires that the input is in SAM format.
+#	-: This indicates that the input is coming from standard input (stdin).
+#	>: This redirects the output to a file specified by the "{output}" parameter.
+#	2>: This redirects the standard error output (stderr) to a file specified by the "{log}" parameter.
+rule resfinder_mapping:
+	input:
+		fw="trimmed_data/{sample}_R1_trimmed.fastq.gz",
+		rv="trimmed_data/{sample}_R2_trimmed.fastq.gz",
+		indexed_db="resfinder_db/resfinder.1.bt2"
+	output:
+		"mapped_reads_resfinder/{sample}_unfiltered.bam"
+	log:
+		"logs/resfinder/{sample}.log"
+	message:
+		"-- Mapping reads to ResFinder database and extracting mapped reads --"
+	conda:
+		"envs/bowtie2.yml"
+	threads: 20
+	shell:
+		"""
+		(bowtie2 -x resfinder_db/resfinder -1 {input.fw} -2 {input.rv} -p {threads} -D 20 -R 3 -N 1 -L 20 -i S,1,0.50 | \
+		samtools view -Sb - > {output}) 2> {log}
+		"""
+
+# This runs the samtools view command on the input file with the -h flag, which outputs the header lines and alignments in SAM format.
+# The awk command is used to perform text processing based on the specified criteria.
+# 	BEGIN {{FS="\t"; OFS="\t"}}: This specifies the field separator (FS) and output field separator (OFS) as tab characters
+#	{{if (/^@/ && substr($2, 3, 1)==":") {{print}} ...}}: This checks if the current line begins with the @ character (header line) and if the third character of the second field (flag) is a colon (:). 
+#		If both conditions are met, the line is printed as it is. Otherwise, the line is skipped and the command moves to the next line.
+#	else if (($7!="=" || $7=="=") && and($2, 0x40)) {{print}}}}: This checks if the seventh field (mate reference name) is not equal to = or is equal to = 
+#		AND if the second field (flag) bitwise-AND (and) with the hexadecimal value 0x40 (corresponding to the 0x40 flag or the first read in a paired-end alignment) is non-zero. If both conditions are met, the line is printed.
+# The samtools view command is used to convert the filtered SAM output to a BAM file (-S flag), remove header lines (-h flag), and output only alignments that pass the filter (-u flag)
+# The resulting BAM file is then saved to the file specified in the output variable using the redirect operator >. The - symbol after -Shu specifies that the input file is read from the standard input (stdin).
+rule resfinder_filtering:
+	input:
+		"mapped_reads_resfinder/{sample}_unfiltered.bam"
+	output:
+		"mapped_reads_resfinder/{sample}.bam"
+	message:
+		"-- Filtering reads before sorting --"
+	conda:
+		"envs/bowtie2.yml"
+	threads: 20
+	shell: #PKY: It seems like it maps only read1 (and($2, 0x40)), do we need to map read2 (and($2, 0x80)) as well?
+		#PKY: If 'and' function is not implemented in awk, change awk to gawk
+		"""
+		samtools view -h {input} | gawk 'BEGIN {{FS="\t"; OFS="\t"}} \
+		{{if (/^@/ && substr($2, 3, 1)==":") {{print}} \
+		else if (($7!="=" || $7=="=") && and($2, 0x40)) {{print}}}}' \
+		| samtools view -Shu - > {output}
+		"""
+
+# This sorts the input SAM file and save the sorted output as a BAM file.
+#	-T sorted_reads_resfinder/{wildcards.sample}: This specifies the prefix for temporary files used during sorting.
+#	-O bam: This specifies the output format of the sorted file.
+#	"{input}" is the input filename of the SAM file to be sorted. This is assumed to be in the current working directory and will be provided by the workflow engine.
+#	">" is a command to redirect the output to a file.
+#	"{output}" is the output filename of the sorted BAM file. This is assumed to be in the current working directory and will be provided by the workflow engine.
+rule resfinder_sorting:
+	input:
+		"mapped_reads_resfinder/{sample}.bam"
+	output:
+		"sorted_reads_resfinder/{sample}.bam"
+	message:
+		"-- Sorting reads --"
+	conda:
+		"envs/bowtie2.yml"
+	threads: 20
+	shell:
+		"samtools sort -T sorted_reads_resfinder/{wildcards.sample} -O bam {input} > {output}"
+
+# This creates an index file for the input BAM file. The resulting index file will have the same filename as the input BAM file, but with the ".bai" extension added. 
+# The index file allows for faster access to specific regions of the BAM file, which can be useful for downstream analysis steps that require rapid random access to the alignment data.
+rule resfinder_indexing:
+	input:
+		"sorted_reads_resfinder/{sample}.bam"
+	output:
+		"sorted_reads_resfinder/{sample}.bam.bai"
+	message:
+		"-- Indexing mapped reads --"
+	conda:
+		"envs/bowtie2.yml"
+	threads: 20
+	shell:
+		"samtools index {input}"
+
+# This runs the samtools idxstats command on the input file, which generates a summary of the alignments in the indexed BAM file. 
+# The idxstats subcommand produces four columns: chromosome name, chromosome length, number of mapped reads, and number of unmapped reads.
+# The grep command filters out any lines that contain the * character. In SAM/BAM format, the * in the first column represents unmapped reads, which are excluded by this command.
+# The cut command extracts the first column (chromosome name)
+rule combine_results_1:
+	input:
+		"sorted_reads_resfinder/BFH1_S123.bam"
+	output:
+		"resfinder_out/gene_names"
+	message:
+		"-- Creating gene_names file --"
+	conda:
+		"envs/bowtie2.yml"
+	threads: 20
+	shell:
+		"""
+		samtools idxstats {input} | grep -v "\*" | cut -f1 > {output}
+		sed -i '1 i\GENE' {output}
+		"""
+
+# This runs the samtools idxstats command on the input file, which generates a summary of the alignments in the indexed BAM file. 
+# The idxstats subcommand produces four columns: chromosome name, chromosome length, number of mapped reads, and number of unmapped reads.
+# The grep command filters out any lines that contain the * character. In SAM/BAM format, the * in the first column represents unmapped reads, which are excluded by this command.
+# The cut command extracts the third column (number of mapped reads)
+rule combine_results_2:
+	input:
+		"sorted_reads_resfinder/{sample}.bam"
+	output:
+		"resfinder_out/{sample}_counts"
+	message:
+		"-- Combine count data into genemat --"
+	conda:
+		"envs/bowtie2.yml"
+	threads: 20
+	shell:
+		'samtools idxstats {input} | grep -v "\*" | cut -f3 > {output}'
+
+# This inserts a line at the beginning of the input file containing the sample name specified by the wildcard variable {wildcards.sample}.
+rule combine_results_3:
+	input:
+		"resfinder_out/{sample}_counts"
+	output:
+		"resfinder_out/renamed_{sample}_counts"
+	message:
+		"-- Adding sample names --"
+	threads: 20
+	shell:
+		"sed '1 i\{wildcards.sample}' {input} > {output}"
+
+# This merges the contents of two files - one that contains gene names and another that contains gene counts - into a single file with gene names and counts arranged horizontally. 
+# The merged file is then saved to the output filename specified by the "{output}" parameter.
+rule combine_results_4:
+	input:
+		gene_names="resfinder_out/gene_names",
+		counts=expand("resfinder_out/renamed_{sample}_counts", sample=SAMPLES)
+	output:
+		"resfinder_out/ARG_genemat.txt",
+	message:
+		"-- Creating ARG_genemat --"
+	threads: 20
+	shell:
+		"paste {input.gene_names} {input.counts} > {output}"
+
+# -------------------------- End of Resfinder Database ----------------------------#
+
+# -------------------------- Start of Card Database -------------------------------#
+
+rule card_db:
+	input:
+		fasta="card_db/card.fasta",
+	output:
+		indexed_db="card_db/card.1.bt2",
+	message:
+		"-- Creating Card database --" 
+	conda:
+		"envs/bowtie2.yml"
+	threads: 20
+	shell:
+		"bowtie2-build {input.fasta} card_db/card"
+
+rule card_mapping:
+	input:
+		fw="trimmed_data/{sample}_R1_trimmed.fastq.gz",
+		rv="trimmed_data/{sample}_R2_trimmed.fastq.gz",
+		indexed_db="card_db/card.1.bt2",
+	output:
+		"mapped_reads_card/{sample}_unfiltered.bam",
+	log:
+		"logs/card/{sample}.log",
+	message:
+		"-- Mapping reads to Card database and extracting mapped reads --"
+	conda:
+		"envs/bowtie2.yml"
+	threads: 20
+	shell:
+		"""
+		(bowtie2 -x card_db/card -1 {input.fw} -2 {input.rv} -p {threads} -D 20 -R 3 -N 1 -L 20 -i S,1,0.50 | \
+		samtools view -Sb - > {output}) 2> {log}
+		"""
+
+rule card_filtering:
+	input:
+		"mapped_reads_card/{sample}_unfiltered.bam",
+	output:
+		"mapped_reads_card/{sample}.bam",
+	message:
+		"-- Filtering reads before sorting --"
+	conda:
+		"envs/bowtie2.yml"
+	threads: 20
+	shell:
+		"""
+		samtools view -h {input} | gawk 'BEGIN {{FS="\t"; OFS="\t"}} \
+		{{if (/^@/ && substr($2, 3, 1)==":") {{print}} \
+		else if (($7!="=" || $7=="=") && and($2, 0x40)) {{print}}}}' \
+		| samtools view -Shu - > {output}
+		"""
+
+rule card_sorting:
+	input:
+		"mapped_reads_card/{sample}.bam",
+	output:
+		"sorted_reads_card/{sample}.bam",
+	message:
+		"-- Sorting reads --"
+	conda:
+		"envs/bowtie2.yml"
+	threads: 20
+	shell:
+		"samtools sort -T sorted_reads_card/{wildcards.sample} -O bam {input} > {output}"
+
+rule card_indexing:
+	input:
+		"sorted_reads_card/{sample}.bam",
+	output:
+		"sorted_reads_card/{sample}.bam.bai",
+	message:
+		"-- Indexing mapped reads --"
+	conda:
+		"envs/bowtie2.yml"
+	threads: 20
+	shell:
+		"samtools index {input}"
+
+rule combine_results_card_1:
+	input:
+		"sorted_reads_card/BFH1_S123.bam",
+	output:
+		"card_out/gene_names",
+	message:
+		"-- Creating gene_names file --"
+	conda:
+		"envs/bowtie2.yml"
+	threads: 20
+	shell:
+		"""
+		samtools idxstats {input} | grep -v "\*" | cut -f1 > {output}
+		sed -i '1 i\GENE' {output}
+		"""
+
+rule combine_results_card_2:
+	input:
+		"sorted_reads_card/{sample}.bam",
+	output:
+		"card_out/{sample}_counts",
+	message:
+		"-- Combine count data into genemat --"
+	conda:
+		"envs/bowtie2.yml"
+	threads: 20
+	shell:
+		'samtools idxstats {input} | grep -v "\*" | cut -f3 > {output}'
+
+rule combine_results_card_3:
+	input:
+		"card_out/{sample}_counts",
+	output:
+		"card_out/renamed_{sample}_counts",
+	message:
+		"-- Adding sample names --"
+	threads: 20
+	shell:
+		"sed '1 i\{wildcards.sample}' {input} > {output}"
+
+rule combine_results_card_4:
+	input:
+		gene_names="card_out/gene_names",
+		counts=expand("card_out/renamed_{sample}_counts", sample=SAMPLES),
+	output:
+		"card_out/ARG_genemat.txt",
+	message:
+		"-- Creating ARG_genemat --"
+	threads: 20
+	shell:
+		"paste {input.gene_names} {input.counts} > {output}"
+
+# -------------------------- End of Card Database -------------------------------#
+
+rule MGE_db:
+	input:
+		fasta="MGE_db/MGE.fasta",
+	output:
+		indexed_db="MGE_db/MGE.1.bt2",
+	message:
+		"-- MGE db --"
+	conda:
+		"envs/bowtie2.yml"
+	threads: 20
+	shell:
+		"bowtie2-build {input.fasta} MGE_db/MGE"
+
+rule MGE_mapping:
+	input:
+		fw="trimmed_data/{sample}_R1_trimmed.fastq.gz",
+		rv="trimmed_data/{sample}_R2_trimmed.fastq.gz",
+		indexed_db="MGE_db/MGE.1.bt2",
+	output:
+		"mapped_reads_MGE/{sample}_unfiltered.bam",
+	log:
+		"logs/MGE/{sample}.log",
+	message:
+		"-- Mapping w/ MGEs --"
+	conda:
+		"envs/bowtie2.yml"
+	threads: 20
+	shell:
+		"""
+		(bowtie2 -x MGE_db/MGE -1 {input.fw} -2 {input.rv} -p {threads} -D 20 -R 3 -N 1 -L 20 -i S,1,0.50 | \
+		samtools view -Sb - > {output}) 2> {log}
+		"""
+
+rule MGE_filtering:
+	input:
+		"mapped_reads_MGE/{sample}_unfiltered.bam",
+	output:
+		"mapped_reads_MGE/{sample}.bam",
+	message:
+		"-- Filtering reads for sorting --"
+	conda:
+		"envs/bowtie2.yml"
+	threads: 20
+	shell:
+		"""
+		samtools view -h {input} | gawk 'BEGIN {{FS="\t"; OFS="\t"}} \
+		{{if (/^@/ && substr($2, 3, 1)==":") {{print}} \
+		else if (($7!="=" || $7=="=") && and($2, 0x40)) {{print}}}}' \
+		| samtools view -Shu - > {output}
+		"""
+
+rule MGE_sorting:
+	input:
+		"mapped_reads_MGE/{sample}.bam",
+	output:
+		"sorted_reads_MGE/{sample}.bam",
+	message:
+		"-- Sorting reads --"
+	conda:
+		"envs/bowtie2.yml"
+	threads: 20
+	shell:
+		"samtools sort -T sorted_reads_MGE/{wildcards.sample} -O bam {input} > {output}"
+
+rule MGE_indexing:
+	input:
+		"sorted_reads_MGE/{sample}.bam",
+	output:
+		"sorted_reads_MGE/{sample}.bam.bai",
+	message:
+		"-- Indexing mapped reads --"
+	conda:
+		"envs/bowtie2.yml"
+	threads: 20
+	shell:
+		"samtools index {input}"
+
+rule combine_MGE_results_1:
+	input:
+		#PKY:Why hard-coded?
+		"sorted_reads_MGE/BFH1_S123.bam",
+	output:
+		"MGE_out/gene_names",
+	message:
+		"-- Creating gene_names file --"
+	conda:
+		"envs/bowtie2.yml"
+	threads: 20
+	shell:
+		"""
+		samtools idxstats {input} | grep -v "\*" | cut -f1 > {output}
+		sed -i '1 i\GENE' {output}
+		"""
+
+rule combine_MGE_results_2:
+	input:
+		"sorted_reads_MGE/{sample}.bam",
+	output:
+		"MGE_out/{sample}_counts",
+	message:
+		"-- Combine count data into genemat --"
+	conda:
+		"envs/bowtie2.yml"
+	threads: 20
+	shell:
+		"""
+		samtools idxstats {input} | grep -v "\*" | cut -f3 > {output}
+		"""
+
+rule combine_MGE_results_3:
+	input:
+		"MGE_out/{sample}_counts",
+	output:
+		"MGE_out/renamed_{sample}_counts",
+	message:
+		"-- Adding sample names --"
+	threads: 20
+	shell:
+		"sed '1 i\{wildcards.sample}' {input} > {output}"
+
+rule combine_MGE_results_4:
+	input:
+		gene_names="MGE_out/gene_names",
+		counts=expand("MGE_out/renamed_{sample}_counts", sample=SAMPLES),
+	output:
+		"MGE_out/MGE_genemat.txt",
+	message:
+		"-- Creating MGE_genemat --"
+	threads: 20
+	shell:
+		"paste {input.gene_names} {input.counts} > {output}"
+
+# This performs taxonomic profiling on the input read files in fastq format, using the MetaPhlAn reference database. 
+# The output will include relative abundance estimates for each taxonomic unit based on read counts. 
+# The Bowtie2 alignment file will also be saved to the output filename specified by the "{output.bowtie2out}" parameter. 
+# The MetaPhlAn results will be saved to the output filename specified by the "{output.file}" parameter.
+#	-t rel_ab_w_read_stats: This specifies the type of output to generate. In this case, the output will include relative abundance estimates for each taxonomic unit based on read counts.
+#	--bowtie2db metaphlan3/: This specifies the location of the MetaPhlAn reference database.
+#	{input.read1},{input.read2}: These are the input filename(s) of the read files in fastq format.
+#	--nproc {threads}: This specifies the number of processors to use for parallel processing.
+#	--bowtie2out {output.bowtie2out}: This specifies the output filename for the Bowtie2 alignment file.
+#	--sample_id {wildcards.sample}: This specifies the sample ID for the output files.
+#	--input_type fastq: This specifies the input file format as fastq.
+#	>: This redirects the output to a file specified by the {output.file} parameter.
+rule metaphlan3:
+	input:
+		read1="trimmed_data/{sample}_R1_trimmed.fastq.gz",
+		read2="trimmed_data/{sample}_R2_trimmed.fastq.gz",
+	output:
+		file="metaphlan3/{sample}_profile.txt",
+		bowtie2out="metaphlan3/{sample}.bowtie2.bz2",
+	message:
+		"-- Running Metaphlan3 --"
+	conda:
+		"envs/metaphlan.yml"
+	threads: 20
+	shell:
+		# Commented below are the original implementation of Markkanen for reference.
+		# Install Metaphlan3 if needed
+		# "metaphlan --install"
+		# Run Metaphlan3
+		# "metaphlan {input.reads} --nproc {threads} --bowtie2out {output.bowtie2out} --sample_id {wildcards.sample} --input_type fastq > {output.file}"
+		"metaphlan -t rel_ab_w_read_stats --bowtie2db metaphlan3/ {input.read1},{input.read2} --nproc {threads} --bowtie2out {output.bowtie2out} --sample_id {wildcards.sample} --input_type fastq > {output.file}"
+		
+# This merges the input MetaPhlAn result tables into a single output file. 
+# The merged output file will be saved to the output filename specified by the "{output}" parameter.
+rule metaphlan3_merge:
+	input:
+		expand("metaphlan3/{sample}_profile.txt", sample=SAMPLES),
+	output:
+		"metaphlan3/merged_abundance_table.txt",
+	message:
+		"-- Merging Metaphlan3 results into table --"
+	conda:
+		"envs/metaphlan.yml"
+	threads: 20
+	shell:
+		"merge_metaphlan_tables.py {input} > {output}"
+
+# This analyzes the input FASTQ files and classifies the reads to the lowest possible taxonomic rank for Bacteria. 
+# The results will be saved in a directory named after the sample ID in the specified output directory.
+#	-1 {input.read1}: This specifies the first input read file.
+#	-2 {input.read2}: This specifies the second input read file (if paired-end sequencing data is being used).
+#	-f fastq: This specifies the input file format.
+#	-z gzip: This specifies that the input files are compressed with gzip.
+#	-t b: This specifies that Metaxa2 should classify reads to the lowest possible taxonomic rank (i.e. species) for Bacteria.
+#	-o metaxa2/{wildcards.sample}: This specifies the output directory for the Metaxa2 results.
+#	--align none: This specifies that Metaxa2 should not perform any alignment.
+#	--graphical F: This specifies that Metaxa2 should not produce graphical output.
+#	--cpu {threads}: This specifies the number of CPU threads to use for the analysis.
+#	--plus: This specifies that Metaxa2 should include reads that contain the "+" character, which can be useful for handling certain types of sequencing data.
+rule metaxa2:
+	input:
+		read1="trimmed_data/{sample}_R1_trimmed.fastq.gz",
+		read2="trimmed_data/{sample}_R2_trimmed.fastq.gz"
+	output:
+		"metaxa2/{sample}.taxonomy.txt"
+	message:
+		"-- Running Metaxa2 --"
+	log:
+		"logs/metaxa2/{sample}.log"
+	conda:
+		"envs/metaxa.yml"
+	threads: 20
+	shell:
+		"metaxa2 -1 {input.read1} -2 {input.read2} -f fastq -z gzip -t b -o metaxa2/{wildcards.sample} --align none --graphical F --cpu {threads} --plus"
+
+# This uses the Metaxa2 Taxonomic Traversal Tool to analyze the input file and classify the reads to the lowest possible taxonomic rank for Bacteria. 
+# The results will be saved in a directory named after the sample ID in the specified output directory. 
+# This tool can be used to further classify reads that were initially classified as "unknown" or "unclassified" by Metaxa2.
+#	-i {input}: This specifies the input filename for the Metaxa2 Taxonomic Traversal Tool (TTT).
+#	-t b: This specifies that the TTT should classify reads to the lowest possible taxonomic rank (i.e. species) for Bacteria.
+#	-o metaxa2/{wildcards.sample}: This specifies the output directory for the TTT results.
+rule metaxa2_ttt:
+	input:
+		"metaxa2/{sample}.taxonomy.txt"
+	output:
+		"metaxa2/{sample}.level_6.txt"
+	message:
+		"-- Running metaxa2_ttt --"
+	conda:
+		"envs/metaxa.yml"
+	threads: 20
+	shell:
+		"metaxa2_ttt -i {input} -t b -o metaxa2/{wildcards.sample}"
+
+# This uses  the Metaxa2 data collector to analyze the taxonomic classifications at the genus level (level 6) that were generated by Metaxa2 and are located in the "metaxa2" directory.
+# The resulting data will be saved in the specified output file.
+# The Metaxa2 data collector is used to summarize taxonomic classifications generated by Metaxa2 and calculate various statistics, such as the number and proportion of reads assigned to different taxonomic groups.
+#	-o {output}: This specifies the output file for the Metaxa2 data collector results.
+#	metaxa2/*level_6.txt: This specifies the input files to be analyzed by the Metaxa2 data collector. The * is a wildcard that matches any file name, and "level_6.txt" indicates that the input files are taxonomic classifications at the rank of genus (level 6).
+rule metaxa2_dc:
+	input:
+		expand("metaxa2/{sample}.level_6.txt", sample=SAMPLES)
+	output:
+		"metaxa2/metaxa_genus.txt"
+	message:
+		"-- Run metaxa2_dc to merge all results into a single table --"
+	conda:
+		"envs/metaxa.yml"
+	threads: 20
+	shell:
+		"metaxa2_dc -o {output} metaxa2/*level_6.txt"

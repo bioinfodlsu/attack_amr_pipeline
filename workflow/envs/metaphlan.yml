@@ -1,0 +1,10 @@
+name: metaphlan_env
+channels:
+  - conda-forge
+  - bioconda
+  - biobakery
+  - defaults  
+dependencies:
+    - python =3.8
+    - metaphlan =4.0
+    - bowtie2 =2.5.1

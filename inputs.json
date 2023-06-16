@@ -1,0 +1,10 @@
+{
+    "fastqFiles" : [
+        "FH1_S162_R1_trimmed.fastq.gz",
+        "FH1_S162_R2_trimmed.fastq.gz"
+    ],
+    "pairedReads" : [
+        ["FH1_S162_R1_trimmed.fastq.gz", "FH1_S162_R2_trimmed.fastq.gz"]
+    ],
+    "resfinderDB" : "resfinder.fasta"
+}
