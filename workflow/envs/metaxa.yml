@@ -1,0 +1,6 @@
+name: metaxa_env
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - metaxa =2.2.3

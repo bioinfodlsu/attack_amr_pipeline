@@ -1,0 +1,3 @@
+name: downsample_env
+channels:
+  - conda-forge
