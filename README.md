@@ -6,7 +6,7 @@ a result of the overuse of antibiotics. Replacing antibiotics with alternative p
 and restore the activity of antibiotics that are no longer effective due to resistance.
 
 
-This serves as a guide to run the analysis pipeline for the wastewater samples written in the Workflow Description Language (WDL).
+This serves as a guide to run the analysis pipeline written in the Workflow Description Language (WDL).
 
 
 ## Installation
