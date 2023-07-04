@@ -79,6 +79,6 @@ These are the steps to run it via **Jupyter Notebook**.
 ```
 3. Run the WDL Script via Jupyter's terminal. 
 ```bash
-   miniwdl check file.wdl --no-shellcheck
+   miniwdl check main.wdl --no-shellcheck
    miniwdl run main.wdl --input inputs.json
 ```
