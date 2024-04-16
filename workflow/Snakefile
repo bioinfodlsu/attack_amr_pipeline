@@ -1,11 +1,11 @@
 # This defines the input files for each sample using glob_wildcards.
 # The input files are located in the "data" directory and have the pattern:
-# 	{sample}_R1_001.fastq.gz
+# 	{sample}_R1.fastq.gz
 # The pattern is used to extract the sample name and store it in the "SAMPLES" variable.
 
 # ***Choose only one!***
 # a.) Uncomment if using raw data instead of trimmed data
-(SAMPLES,) = glob_wildcards("data/{sample}_R1_001.fastq.gz")
+(SAMPLES,) = glob_wildcards("data/{sample}_R1.fastq.gz")
 # b.) Uncomment to use for downsampling or if raw data files are already deleted
 #(SAMPLES,) = glob_wildcards("trimmed_data/{sample}_R1_trimmed.fastq.gz")
 
@@ -13,7 +13,7 @@
 rule all:
 	input:
 		# Uncomment if using raw data instead of trimmed data
-		expand("data/FASTQC/{sample}_{read}_001_fastqc.zip", sample=SAMPLES, read=["R1", "R2"]),
+		expand("data/FASTQC/{sample}_{read}_fastqc.zip", sample=SAMPLES, read=["R1", "R2"]),
 		"data/multiqc_report.html",
 		expand("trimmed_data/{sample}_{read}_trimmed.fastq.gz", sample=SAMPLES,	read=["R1", "R2"]),
 		expand("trimmed_data/FASTQC/{sample}_{read}_trimmed_fastqc.zip", sample=SAMPLES, read=["R1", "R2"]),
@@ -64,9 +64,9 @@ rule all:
 #	{input}: This specifies the input file for FastQC to perform QC on.
 rule fastqc_raw:
 	input:
-		"data/{sample}_{read}_001.fastq.gz",
+		"data/{sample}_{read}.fastq.gz",
 	output:
-		"data/FASTQC/{sample}_{read}_001_fastqc.zip",
+		"data/FASTQC/{sample}_{read}_fastqc.zip",
 	message:
 		"-- Quality check of raw data with Fastqc --"
 	conda:
@@ -84,7 +84,7 @@ rule fastqc_raw:
 rule multiqc_raw:
 	input:
 		expand(
-			"data/FASTQC/{sample}_{read}_001_fastqc.zip",
+			"data/FASTQC/{sample}_{read}_fastqc.zip",
 			sample=SAMPLES,
 			read=["R1", "R2"],
 		),
@@ -110,8 +110,8 @@ rule multiqc_raw:
 #	> {output.log}: This redirects the standard output to a log file named "{output.log}" in the current working directory.
 rule cutadapt:
 	input:
-		fw="data/{sample}_R1_001.fastq.gz",
-		rv="data/{sample}_R2_001.fastq.gz"
+		fw="data/{sample}_R1.fastq.gz",
+		rv="data/{sample}_R2.fastq.gz"
 	output:
 		fw="trimmed_data/{sample}_R1_trimmed.fastq.gz",
 		rv="trimmed_data/{sample}_R2_trimmed.fastq.gz",
@@ -311,7 +311,7 @@ rule resfinder_indexing:
 # The cut command extracts the first column (chromosome name)
 rule combine_results_1:
 	input:
-		"sorted_reads_resfinder/BFH1_S123.bam"
+		"sorted_reads_resfinder/UST6.bam"
 	output:
 		"resfinder_out/gene_names"
 	message:
@@ -451,7 +451,7 @@ rule card_indexing:
 
 rule combine_results_card_1:
 	input:
-		"sorted_reads_card/BFH1_S123.bam",
+		"sorted_reads_card/UST6.bam",
 	output:
 		"card_out/gene_names",
 	message:
@@ -583,7 +583,7 @@ rule MGE_indexing:
 rule combine_MGE_results_1:
 	input:
 		#PKY:Why hard-coded?
-		"sorted_reads_MGE/BFH1_S123.bam",
+		"sorted_reads_MGE/UST6.bam",
 	output:
 		"MGE_out/gene_names",
 	message:
