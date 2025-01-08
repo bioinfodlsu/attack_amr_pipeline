@@ -20,21 +20,21 @@ rule all:
 		"trimmed_data/multiqc_report.html",
 		# ***Choose only one of either Resfinder or CARD AMR database!***
 		# a.) Uncomment if using Resfinder database
-		"resfinder_db/resfinder.1.bt2",
-		expand("mapped_reads_resfinder/{sample}_unfiltered.bam", sample=SAMPLES),
-		expand("logs/resfinder/{sample}.log", sample=SAMPLES),
-		expand("mapped_reads_resfinder/{sample}.bam", sample=SAMPLES),
-		expand("sorted_reads_resfinder/{sample}.bam.bai", sample=SAMPLES),
-		"resfinder_out/gene_names",
-		"resfinder_out/ARG_genemat.txt",
+		# "resfinder_db/resfinder.1.bt2",
+		# expand("mapped_reads_resfinder/{sample}_unfiltered.bam", sample=SAMPLES),
+		# expand("logs/resfinder/{sample}.log", sample=SAMPLES),
+		# expand("mapped_reads_resfinder/{sample}.bam", sample=SAMPLES),
+		# expand("sorted_reads_resfinder/{sample}.bam.bai", sample=SAMPLES),
+		# "resfinder_out/gene_names",
+		# "resfinder_out/ARG_genemat.txt",
 		# b.) Uncomment 7 lines below if using CARD database
-		#"card_db/card.1.bt2",
-		#expand("mapped_reads_card/{sample}_unfiltered.bam", sample=SAMPLES),
-		#expand("logs/card/{sample}.log", sample=SAMPLES),
-		#expand("mapped_reads_card/{sample}.bam", sample=SAMPLES),
-		#expand("sorted_reads_card/{sample}.bam.bai", sample=SAMPLES),
-		#"card_out/gene_names",
-		#"card_out/ARG_genemat.txt",
+		"card_db/card.1.bt2",
+		expand("mapped_reads_card/{sample}_unfiltered.bam", sample=SAMPLES),
+		expand("logs/card/{sample}.log", sample=SAMPLES),
+		expand("mapped_reads_card/{sample}.bam", sample=SAMPLES),
+		expand("sorted_reads_card/{sample}.bam.bai", sample=SAMPLES),
+		"card_out/gene_names",
+		"card_out/ARG_genemat.txt",
 		# Uncomment to run MGE database
 		"MGE_db/MGE.1.bt2",
 		expand("mapped_reads_MGE/{sample}_unfiltered.bam", sample=SAMPLES),
@@ -44,11 +44,18 @@ rule all:
 		"MGE_out/gene_names",
 		"MGE_out/MGE_genemat.txt",
 		# Uncomment to run metaphlan
-		expand("metaphlan3/{sample}_profile.txt", sample=SAMPLES),
-		"metaphlan3/merged_abundance_table.txt",
+		# expand("metaphlan/{sample}_profile.txt", sample=SAMPLES),
+		# "metaphlan/merged_abundance_table.txt",
 		# Uncomment to run metaxa
-		#expand("metaxa2/{sample}.level_6.txt", sample=SAMPLES),
-		#"metaxa2/metaxa_genus.txt"
+		expand("metaxa2/{sample}.level_6.txt", sample=SAMPLES),
+		"metaxa2/metaxa_genus.txt",
+		#Uncomment to run kraken2
+		expand("kraken2/{sample}.tab", sample=SAMPLES),
+		expand("kraken2/{sample}_breport", sample=SAMPLES),
+		expand("kraken2/{sample}_bracken.tab", sample=SAMPLES),
+		expand("kreport2mpa/{sample}_mpa.tab", sample=SAMPLES),
+		expand("kreport2mpa_norm/{sample}_profile.tab", sample=SAMPLES),
+		"kreport2mpa_norm/merged_metakraken_abundance_table.txt"
 
 # ***DO NOT UNCOMMENT! For downsampling sequence data only!***
 # rule all:
@@ -647,33 +654,28 @@ rule combine_MGE_results_4:
 #	--sample_id {wildcards.sample}: This specifies the sample ID for the output files.
 #	--input_type fastq: This specifies the input file format as fastq.
 #	>: This redirects the output to a file specified by the {output.file} parameter.
-rule metaphlan3:
+rule metaphlan:
 	input:
 		read1="trimmed_data/{sample}_R1_trimmed.fastq.gz",
 		read2="trimmed_data/{sample}_R2_trimmed.fastq.gz",
 	output:
-		file="metaphlan3/{sample}_profile.txt",
-		bowtie2out="metaphlan3/{sample}.bowtie2.bz2",
+		file="metaphlan/{sample}_profile.txt",
+		bowtie2out="metaphlan/{sample}.bowtie2.bz2",
 	message:
-		"-- Running Metaphlan3 --"
+		"-- Running Metaphlan --"
 	conda:
 		"envs/metaphlan.yml"
 	threads: 20
 	shell:
-		# Commented below are the original implementation of Markkanen for reference.
-		# Install Metaphlan3 if needed
-		# "metaphlan --install"
-		# Run Metaphlan3
-		# "metaphlan {input.reads} --nproc {threads} --bowtie2out {output.bowtie2out} --sample_id {wildcards.sample} --input_type fastq > {output.file}"
-		"metaphlan -t rel_ab_w_read_stats --bowtie2db metaphlan3/ {input.read1},{input.read2} --nproc {threads} --bowtie2out {output.bowtie2out} --sample_id {wildcards.sample} --input_type fastq > {output.file}"
-		
+	"metaphlan -t rel_ab_w_read_stats --bowtie2db metaphlan/ {input.read1},{input.read2} --nproc {threads} --bowtie2out {output.bowtie2out} --sample_id {wildcards.sample} --input_type fastq > {output.file}"
+
 # This merges the input MetaPhlAn result tables into a single output file. 
 # The merged output file will be saved to the output filename specified by the "{output}" parameter.
-rule metaphlan3_merge:
+rule metaphlan_merge:
 	input:
-		expand("metaphlan3/{sample}_profile.txt", sample=SAMPLES),
+		expand("metaphlan/{sample}_profile.txt", sample=SAMPLES),
 	output:
-		"metaphlan3/merged_abundance_table.txt",
+		"metaphlan/merged_abundance_table.txt",
 	message:
 		"-- Merging Metaphlan3 results into table --"
 	conda:
@@ -746,3 +748,81 @@ rule metaxa2_dc:
 	threads: 20
 	shell:
 		"metaxa2_dc -o {output} metaxa2/*level_6.txt"
+
+
+rule kraken2:
+	input:
+		read1="trimmed_data/{sample}_R1_trimmed.fastq.gz",
+		read2="trimmed_data/{sample}_R2_trimmed.fastq.gz"
+	output:
+		kraken = "kraken2/{sample}.kraken2",
+		report = "kraken2/{sample}.tab"
+	message:
+		"-- Running Kraken2 --"
+	conda:
+		"envs/kraken2.yml"
+	threads: 20
+	shell:
+		"kraken2 --db kraken2_db --threads {threads} --paired --output {output.kraken} --report {output.report} {input.read1} {input.read2}"
+
+
+#Geneate bracken report in tsv format
+rule bracken:
+	input:
+		kraken="kraken2/{sample}.tab"
+	output:
+		br1 = "kraken2/{sample}_breport",
+		br2 = "kraken2/{sample}_bracken.tab"
+	message:
+		"-- Running Bracken --"
+	conda:
+		"envs/kraken2.yml"
+	threads: 20
+	shell:
+		"bracken -d kraken2_db -i {input} -l G -t 150 -r 250 -o {output.br1}"
+
+
+# Bracken to Metaphlan Format
+rule bracken_to_metaphlan:
+	input:
+		report = "kraken2/{sample}_bracken.tab"
+	output:
+		mpa = "kreport2mpa/{sample}_mpa.tab"
+	message:
+		"-- Combining Bracken results into Metaphlan format --"
+	conda:
+		"envs/kraken2.yml"
+	shell:
+		"""
+		kreport2mpa.py -r {input} -o {output}
+		"""
+rule normalize_to_mpa:
+	input:
+		r1 = "kreport2mpa/{sample}_mpa.tab"
+	output:
+		"kreport2mpa_norm/{sample}_profile.tab"
+	message:
+		"-- Normalizing Bracken results to Metaphlan format --"
+	shell:
+		"""
+        sum=$(grep -vP "\\|" {input} | cut -f 2 | awk '{{sum += $1}} END {{printf ("%.2f\\n", sum/100)}}')
+        awk -v sum="$sum" 'BEGIN {{FS="\\t"}} {{OFS="\\t"}} {{print $1,$2/sum}}' {input} > {output}
+        """
+
+rule merge_mpa:
+	input:
+		expand("kreport2mpa_norm/{sample}_profile.tab", sample=SAMPLES)
+	output:
+	    merge = "kreport2mpa_norm/merged_metakraken_abundance_table.txt"
+	conda:
+		"envs/metaphlan2.yml"
+	shell:
+		"""
+		merge_metaphlan_tables.py {input} >  {output.merge}
+		"""
+
+
+
+
+
+
