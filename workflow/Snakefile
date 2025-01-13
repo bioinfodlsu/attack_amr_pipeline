@@ -6,21 +6,20 @@
 # ***Choose only one!***
 # a.) Uncomment if using raw data instead of trimmed data
 (SAMPLES,) = glob_wildcards("data/{sample}_R1.fastq.gz")
-# b.) Uncomment to use for downsampling or if raw data files are already deleted
-#(SAMPLES,) = glob_wildcards("trimmed_data/{sample}_R1_trimmed.fastq.gz")
+
 
 # This defines the output files for the pipeline.
 rule all:
 	input:
-		# Uncomment if using raw data instead of trimmed data
 		expand("data/FASTQC/{sample}_{read}_fastqc.zip", sample=SAMPLES, read=["R1", "R2"]),
 		"data/multiqc_report.html",
 		expand("trimmed_data/{sample}_{read}_trimmed.fastq.gz", sample=SAMPLES,	read=["R1", "R2"]),
 		expand("trimmed_data/FASTQC/{sample}_{read}_trimmed_fastqc.zip", sample=SAMPLES, read=["R1", "R2"]),
 		"trimmed_data/multiqc_report.html",
-		# ***Choose only one of either Resfinder or CARD AMR database!***
+		# ***Choose only one of either Resfinder or CARD database!***
 		# a.) Uncomment if using Resfinder database
 		# "resfinder_db/resfinder.1.bt2",
+		#"resfinder_db/resfinder_length.txt",
 		# expand("mapped_reads_resfinder/{sample}_unfiltered.bam", sample=SAMPLES),
 		# expand("logs/resfinder/{sample}.log", sample=SAMPLES),
 		# expand("mapped_reads_resfinder/{sample}.bam", sample=SAMPLES),
@@ -29,6 +28,7 @@ rule all:
 		# "resfinder_out/ARG_genemat.txt",
 		# b.) Uncomment 7 lines below if using CARD database
 		"card_db/card.1.bt2",
+		"card_db/card_length.txt",
 		expand("mapped_reads_card/{sample}_unfiltered.bam", sample=SAMPLES),
 		expand("logs/card/{sample}.log", sample=SAMPLES),
 		expand("mapped_reads_card/{sample}.bam", sample=SAMPLES),
@@ -37,6 +37,7 @@ rule all:
 		"card_out/ARG_genemat.txt",
 		# Uncomment to run MGE database
 		"MGE_db/MGE.1.bt2",
+		"MGE_db/MGE_length.txt",
 		expand("mapped_reads_MGE/{sample}_unfiltered.bam", sample=SAMPLES),
 		expand("logs/MGE/{sample}.log", sample=SAMPLES),
 		expand("mapped_reads_MGE/{sample}.bam", sample=SAMPLES),
@@ -131,34 +132,6 @@ rule cutadapt:
 	shell:
 		"cutadapt -a CTGTCTCTTATACACATCT -A CTGTCTCTTATACACATCT -O 10 -m 30 -q 20 {input.fw} {input.rv} -o {output.fw} -p {output.rv} > {output.log}"
 
-# ***This is for downsampling sequence data only!***
-rule downsample_R1:
-	input:
-		read1="trimmed_data/{sample}_R1_trimmed.fastq.gz",
-	output:
-		read1="trimmed_data/z{sample}_R1_trimmed.fastq.gz",
-	message:
-		"-- Downsampling Trimmed Data for R1 --"
-	conda:
-		"envs/downsample.yml"
-	threads:
-		1
-	shell: # 12518768 = 10% of #lines of BFH1
-		"zcat -c {input.read1} | head -n 12518768 | gzip - > {output.read1} || true"
-
-# ***This is for downsampling sequence data only!***
-rule downsample_R2:
-	input:
-		read2="trimmed_data/{sample}_R2_trimmed.fastq.gz",
-	output:
-		read2="trimmed_data/z{sample}_R2_trimmed.fastq.gz",
-	message:
-		"-- Downsampling Trimmed Data for R2 --"
-	conda:
-		"envs/downsample.yml"
-	threads: 1
-	shell: # 12518768 = 10% of #lines of BFH1
-		"zcat -c {input.read2} | head -n 12518768 | gzip - > {output.read2} || true"
 
 # This runs FastQC, a tool for performing quality control (QC) on trimmed sequencing data.
 # 	--quiet: This suppresses some of the verbose output that FastQC normally produces.
@@ -218,6 +191,22 @@ rule resfinder_db:
 	threads: 20
 	shell:
 		"bowtie2-build {input.fasta} resfinder_db/resfinder"
+
+rule resfinder_length:
+	input:
+		fasta="resfinder_db/resfinder.fasta"
+	output:
+		"resfinder_db/resfinder_length.txt"
+	message:
+		"-- Creating ResFinder length file --"
+	conda:
+		"envs/bowtie2.yml"
+	threads: 20
+	shell:
+		"""
+        echo 'GENE\tLength' > {output}
+        bioawk -c fastx '{{ print $name, length($seq) }}' {input.fasta} >> {output}
+        """
 
 # This runs the Bowtie2 aligner on paired-end reads specified by {input.fw} and {input.rv} variables, using the reference index resfinder_db/resfinder (-x flag), with a specified number of threads (-p flag), and other options:
 #	-D 20: This sets the maximum number of seed extension attempts to 20.
@@ -392,6 +381,22 @@ rule card_db:
 	shell:
 		"bowtie2-build {input.fasta} card_db/card"
 
+rule card_length:
+	input:
+		fasta="card_db/card.fasta",
+	output:
+		"card_db/card_length.txt",
+	message:
+		"-- Creating Card length file --"
+	conda:
+		"envs/bowtie2.yml"
+	threads: 20
+	shell:
+		"""
+		echo 'GENE\tLength' > {output}
+		bioawk -c fastx '{{ print $name, length($seq) }}' {input.fasta} >> {output}
+		"""
+
 rule card_mapping:
 	input:
 		fw="trimmed_data/{sample}_R1_trimmed.fastq.gz",
@@ -523,6 +528,22 @@ rule MGE_db:
 	shell:
 		"bowtie2-build {input.fasta} MGE_db/MGE"
 
+rule MGE_length:
+	input:
+		fasta="MGE_db/MGE.fasta",
+	output:
+		"MGE_db/MGE_length.txt",
+	message:
+		"-- Creating MGE length file --"
+	conda:
+		"envs/bowtie2.yml"
+	threads: 20
+	shell:
+		"""
+		echo 'GENE\tLength' > {output}
+		bioawk -c fastx '{{ print $name, length($seq) }}' {input.fasta} >> {output}
+		"""
+
 rule MGE_mapping:
 	input:
 		fw="trimmed_data/{sample}_R1_trimmed.fastq.gz",
@@ -647,7 +668,7 @@ rule combine_MGE_results_4:
 # The Bowtie2 alignment file will also be saved to the output filename specified by the "{output.bowtie2out}" parameter. 
 # The MetaPhlAn results will be saved to the output filename specified by the "{output.file}" parameter.
 #	-t rel_ab_w_read_stats: This specifies the type of output to generate. In this case, the output will include relative abundance estimates for each taxonomic unit based on read counts.
-#	--bowtie2db metaphlan3/: This specifies the location of the MetaPhlAn reference database.
+#	--bowtie2db metaphlan/: This specifies the location of the MetaPhlAn reference database.
 #	{input.read1},{input.read2}: These are the input filename(s) of the read files in fastq format.
 #	--nproc {threads}: This specifies the number of processors to use for parallel processing.
 #	--bowtie2out {output.bowtie2out}: This specifies the output filename for the Bowtie2 alignment file.
@@ -677,7 +698,7 @@ rule metaphlan_merge:
 	output:
 		"metaphlan/merged_abundance_table.txt",
 	message:
-		"-- Merging Metaphlan3 results into table --"
+		"-- Merging Metaphlan results into table --"
 	conda:
 		"envs/metaphlan.yml"
 	threads: 20
