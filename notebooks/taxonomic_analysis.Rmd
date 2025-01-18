@@ -118,17 +118,26 @@ pca_data$month <- wide_genus_data$month
 
 head(pca_data$PC1)
 
+variance_explained <- pca_result$CA$eig / sum(pca_result$CA$eig) * 100
+
+# Names for the first two principal components including their variance explained
+pc1_label <- paste("PC1 (", formatC(variance_explained[1], format = "f", digits = 2), "%)", sep="")
+pc2_label <- paste("PC2 (", formatC(variance_explained[2], format = "f", digits = 2), "%)", sep="")
+
+# Update your ggplot code for PCA
 p <- ggplot(pca_data, aes(x = PC1, y = PC2, label = SampleID, group = hospital)) +
   geom_point(aes(color = hospital), size = 4, alpha = 0.8) + 
   geom_text(vjust = 1.5, hjust = 1.5, size = 8) +  
   stat_ellipse(level = 0.95, linetype = 2, aes(color = hospital), size = 1) +
   scale_color_manual(values = c("#D4070F", "#1C1AAF", "#c68e17")) +
+  labs(x = pc1_label, y = pc2_label) +
+  theme_minimal()+
   theme(text = element_text(family = "Palatino"),
         legend.title = element_blank(),
         legend.text = element_text(size = 26),
         legend.key.size = unit(1, 'cm'),
         legend.position = c(0.15, 0.9),
-        legend.background = element_rect(color = "#ffffff"),
+        legend.background = element_rect(color = "#CECECE"),
         legend.direction = "horizontal",
         axis.text.x = element_text(size = 26, angle = 0, hjust = 0.5),
         axis.text.y = element_text(size = 26),
@@ -136,21 +145,23 @@ p <- ggplot(pca_data, aes(x = PC1, y = PC2, label = SampleID, group = hospital))
         axis.title.y = element_text(size = 26),  
         plot.margin = unit(c(1, 1, 1, 1), "cm"))
 
+
+
 # Save the plot
-ggsave(filename = "Taxonomic_PCA_Genus.png",
-       width = 16, height = 13, dpi = 300, units = "in", device = 'png', scale = 1)
+ggsave(filename = "Taxonomic_PCA_Genus.jpg",
+       width = 16, height = 13, dpi = 300, units = "in", device = 'jpg', scale = 1)
 ```
 
 ```{r}
 
 # Select the data for PCA
 
-top_genus <- genus_data %>%
-  group_by(ID) %>%
-  summarise(AverageAbundance = median(RelativeAbundance, na.rm = TRUE)) %>%
-  arrange(desc(AverageAbundance)) %>%
-  top_n(20, AverageAbundance) %>%
-  pull(ID)
+# top_genus <- genus_data %>%
+#   group_by(ID) %>%
+#   summarise(AverageAbundance = median(RelativeAbundance, na.rm = TRUE)) %>%
+#   arrange(desc(AverageAbundance)) %>%
+#   top_n(20, AverageAbundance) %>%
+#   pull(ID)
 
 selected_data <- wide_genus_data%>% select(c(18: ncol(wide_genus_data)))
 
@@ -180,11 +191,17 @@ scores_df$SampleID <- wide_genus_data$SampleID
 scores_df$month <- wide_genus_data$month
 
 # Optional: Filter the loadings to display only the top contributing genes
-top_loadings <- loadings_df %>%
-  mutate(PC1_contribution = abs(PC1),
-         PC2_contribution = abs(PC2)) %>%
-  arrange(desc(PC1_contribution + PC2_contribution)) %>%
-  head(50)
+# top_loadings <- loadings_df %>%
+#   mutate(PC1_contribution = abs(PC1),
+#          PC2_contribution = abs(PC2)) %>%
+#   arrange(desc(PC1_contribution + PC2_contribution)) %>%
+#   head(30)
+
+
+variance_explained <- pca_result$CA$eig / sum(pca_result$CA$eig) * 100
+
+pc1_label <- paste("PC1 (", formatC(variance_explained[1], format = "f", digits = 2), "%)", sep="")
+pc2_label <- paste("PC2 (", formatC(variance_explained[2], format = "f", digits = 2), "%)", sep="")
 
 
 combined_plot <- ggplot() +
@@ -195,7 +212,7 @@ combined_plot <- ggplot() +
   geom_label_repel(data = top_loadings, aes(x = PC1, y = PC2, label = Variable), color = "black", size = 8, alpha = 0.7, max.overlaps = 100, box.padding = 0.5) +
   stat_ellipse(data = scores_df, aes(x = PC1, y = PC2, color = hospital), level = 0.95, linetype = 2, size = 1) +
   theme_minimal() +
-  labs(x = "PC1", y = "PC2") +
+  labs(x = pc1_label, y = pc2_label) +
   theme(text = element_text(family = "Palatino"),
         axis.title = element_text(size = 24, face = "bold"),
         legend.title = element_blank(),
