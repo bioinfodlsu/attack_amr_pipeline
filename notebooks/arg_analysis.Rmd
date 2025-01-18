@@ -166,7 +166,7 @@ create_plot_classes <- function(data, top_classes, hospital_name) {
     ) +
     theme_light() +
     theme(
-      axis.text.x = element_text(size = 16, angle = 0, hjust = 1),
+      axis.text.x = element_text(size = 16, angle = 0, hjust = 0.5),
       axis.text.y = element_text(size = 16),
       axis.title.x = element_text(size = 18),                       
       axis.title.y = element_text(size = 18),  
@@ -253,7 +253,7 @@ create_plot_genes <- function(data, top_genes, hospital_name) {
     ) +
     theme_light() +
     theme(
-      axis.text.x = element_text(size = 16, angle = 0, hjust = 1),
+      axis.text.x = element_text(size = 16, angle = 0, hjust = 0.5),
       axis.text.y = element_text(size = 16),
       axis.title.x = element_text(size = 18),                       
       axis.title.y = element_text(size = 18),  
