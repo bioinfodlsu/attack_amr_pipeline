@@ -287,7 +287,7 @@ create_plot_genera <- function(data, top_genera, hospital_name) {
     ) +
     theme_light() +
     theme(
-      axis.text.x = element_text(size = 16, angle = 0, hjust = 1),
+      axis.text.x = element_text(size = 16, angle = 0, hjust = 0.5),
       axis.text.y = element_text(size = 16),
       axis.title.x = element_text(size = 18),                       
       axis.title.y = element_text(size = 18),  
@@ -361,7 +361,7 @@ create_plot_phyla <- function(data, top_phyla, hospital_name) {
     ) +
     theme_light() +
     theme(
-      axis.text.x = element_text(size = 16, angle = 0, hjust = 1),
+      axis.text.x = element_text(size = 16, angle = 0, hjust = 0.5),
       axis.text.y = element_text(size = 16),
       axis.title.x = element_text(size = 18),                       
       axis.title.y = element_text(size = 18),  
