@@ -298,11 +298,19 @@ pca_data$hospital <- factor(card_df$hospital, labels = c("A", "B", "C"))
 pca_data$SampleID <- card_df$SampleID
 pca_data$month <- card_df$month
 
+variance_explained <- pca_result$CA$eig / sum(pca_result$CA$eig) * 100
+
+pc1_label <- paste("PC1 (", formatC(variance_explained[1], format = "f", digits = 2), "%)", sep="")
+pc2_label <- paste("PC2 (", formatC(variance_explained[2], format = "f", digits = 2), "%)", sep="")
+
+
 p <- ggplot(pca_data, aes(x = PC1, y = PC2, label = SampleID, group = hospital)) +
   geom_point(aes(color = hospital), size = 4, alpha = 0.8) + 
   geom_text(vjust = 1.5, hjust = 1.5, size = 6) +  
   stat_ellipse(level = 0.95, linetype = 2, aes(color = hospital), size = 1) +
   scale_color_manual(values = c("#D4070F", "#1C1AAF", "#c68e17")) +
+  labs(x = pc1_label, y = pc2_label) +
+  theme_minimal()+
   theme(text = element_text(family = "Palatino"),
         legend.title = element_blank(),
         legend.text = element_text(size = 26),
@@ -317,10 +325,9 @@ p <- ggplot(pca_data, aes(x = PC1, y = PC2, label = SampleID, group = hospital))
         plot.margin = unit(c(1, 1, 1, 1), "cm"))
 
 # Save the plot
-ggsave(filename = "CARD_pca_arg.png",
+ggsave(filename = "CARD_pca_arg.jpg",
        plot = p,
-       width = 16, height = 13, dpi = 300, units = "in", device = 'png', scale = 1)
-
+       width = 16, height = 13, dpi = 300, units = "in", device = 'jpg', scale = 1)
 
 
 ```
@@ -355,6 +362,11 @@ scores_df$month <- card_df$month
 #   arrange(desc(PC1_contribution + PC2_contribution)) %>%
 #   head(30) 
 
+variance_explained <- pca_result$CA$eig / sum(pca_result$CA$eig) * 100
+
+pc1_label <- paste("PC1 (", formatC(variance_explained[1], format = "f", digits = 2), "%)", sep="")
+pc2_label <- paste("PC2 (", formatC(variance_explained[2], format = "f", digits = 2), "%)", sep="")
+
 combined_plot <- ggplot() +
   geom_point(data = scores_df, aes(x = PC1, y = PC2, color = hospital), size = 4, alpha = 0.8) +
   geom_text_repel(data = scores_df, aes(x = PC1, y = PC2, label = SampleID), size = 7, alpha = 0.8, max.overlaps = 100) + 
@@ -363,7 +375,7 @@ combined_plot <- ggplot() +
   geom_label_repel(data = top_loadings, aes(x = PC1, y = PC2, label = Variable), color = "black", size = 8, alpha = 0.7, max.overlaps = 100, box.padding = 0.5) +  
   stat_ellipse(data = scores_df, aes(x = PC1, y = PC2, color = hospital), level = 0.95, linetype = 2, size = 1) +
   theme_minimal() +
-  labs(x = "PC1", y = "PC2") +
+  labs(x = pc1_label, y = pc2_label) +
   theme(text = element_text(family = "Palatino"),
         axis.title = element_text(size = 24, face = "bold"),
         legend.title = element_blank(),
