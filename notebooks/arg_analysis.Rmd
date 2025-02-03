@@ -761,3 +761,61 @@ venn.plot <- venn.diagram(
 )
 
 ```
+
+### Heatmap
+```{r}
+critically_important_args <- c(
+  "AAC(6')-Ib'", "AAC(6')-Iid", "aadA", "adeJ", "adeK", "bacA", "bacA", "BEL-2", 
+  "dfrA1", "dfrA12", "dfrA14", "dfrA15", "dfrA17", "dfrA23", "dfrA25", "dfrA5", 
+  "ereA", "ereB", "ermB", "ermB", "ermC", "ermF", "ermT", "floR", "fosA", 
+  "GES-1", "GES-11", "GES-5", "IMP-1", "IMP-26", "IMP-4", "KPC-6", "lnuB", 
+  "mcr-5", "mdtE", "mecA", "mexB", "mexI", "MOX-6", "mphA", "msrC", "NDM-1", 
+  "NDM-5", "NDM-6", "NPS-1", "OXA-1", "OXA-10", "OXA-101", "OXA-119", "OXA-13", 
+  "OXA-17", "OXA-2", "OXA-211", "OXA-212", "OXA-309", "OXA-333", "OXA-35", 
+  "OXA-4", "OXA-5", "OXA-58", "PER-3", "SHV-5", "sul1", "sul2", "TEM-1", 
+  "TEM-156", "TEM-169", "TEM-83", "tet(39)", "tet(A)", "tet(L)", "tet(M)", 
+  "tet(O)", "tet(Q)", "tet(W)", "VEB-3", "VEB-3", "VIM-1", "VIM-2"
+)
+
+filtered_data <- combined_data %>%
+  filter(GENE %in% critically_important_args)
+
+summary_data <- filtered_data %>%
+  group_by(hospital, GENE) %>%
+  summarize(Abundance = mean(Count, na.rm = TRUE), .groups = 'drop')
+
+heatmap_data <- summary_data %>%
+  pivot_wider(names_from = GENE, values_from = Abundance, values_fill = list(Abundance = 0)) %>%
+  pivot_longer(cols = -hospital, names_to = "GENE", values_to = "Abundance")
+
+
+heatmap_data <- heatmap_data %>%
+  mutate(Presence = ifelse(Abundance > 0, 1, 0))
+
+data_long <- heatmap_data %>%
+  select(hospital, GENE, Presence)
+
+heatmap <- ggplot(data_long, aes(x = GENE, y = as.factor(hospital), fill = factor(Presence))) +
+  geom_tile() +
+  scale_fill_manual(values = c("0" = "white", "1" = "black")) +
+  labs(title = "Critically Important ARGs",
+       x = "ARGs",
+       y = "Hospital", 
+       fill = "Presence") +
+  theme_minimal(base_size = 12) +
+  theme(
+    axis.text.x = element_text(angle = 90, hjust = 1, size = 8),
+    axis.text.y = element_text(size = 8),
+    axis.title.x = element_text(size = 10),
+    axis.title.y = element_text(size = 10),
+    plot.title = element_text(size = 14, hjust = 0.5),
+    legend.title = element_text(size = 10),
+    legend.text = element_text(size = 8)
+  ) +
+  coord_fixed(ratio = 1)
+
+print (heatmap)
+ggsave(filename = "Heatmap_ARGs.jpg",
+       plot = heatmap,
+       width = 16, height = 5, dpi = 300, units = "in", device = 'jpg', scale = 1)
+```
