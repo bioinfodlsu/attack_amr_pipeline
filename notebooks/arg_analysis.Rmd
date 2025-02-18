@@ -34,7 +34,7 @@ card_lengths_orig <- read.delim("card_length.txt", header = TRUE)
 
 ```
 
-#### Merging Metadata and Normalizing Counts using Metaxa
+#### Merging Metadata and Normalizing Counts
 
 ```{r}
 extract_gene_name <- function(full_name) {
@@ -50,15 +50,8 @@ drug_class_card <- drug_class_card_orig %>%
 card_lengths<- card_lengths_orig %>%
   mutate(GENE = extract_gene_name(GENE))
 
-long_metaxa <- metaxa_data %>%
-  pivot_longer(cols = -Taxa, names_to = "SampleID", values_to = "Count")
-
-combined_metaxa <- merge(long_metaxa, metadata, by = "SampleID", all.x = TRUE)
 combined_length <- merge (card_data, card_lengths, by = "GENE", all.x = TRUE)
-
-ssu_counts <- combined_metaxa %>%
-  group_by(SampleID) %>%
-  summarize(SSU_Counts = sum(Count))
+combined_bases <- merge(number_bases, metadata, by = "SampleID", all.x = TRUE)
 
 rownames(combined_length) <- combined_length$GENE
 
@@ -68,20 +61,24 @@ card_length_norm <- combined_length[, 1:(ncol(combined_length)-1)]  / combined_l
 
 card_length_norm <- card_length_norm[ , order(names(card_length_norm))]
 
-
-# Normalization with Metaxa2 SSU counts
 card_length_norm_t <- t(card_length_norm)
-ssu_counts <- ssu_counts %>% select(-SampleID)
-card_length_norm_t <- sweep(card_length_norm_t, 1, t(ssu_counts), FUN = "/")
-card_length_SSU_norm <- t(card_length_norm_t) * 1540
 
-row.names(card_length_SSU_norm)
+# Modify the B column** (Multiply by 10^9, then divide by 4.6 x 10^6)
+combined_bases <- combined_bases %>%
+  mutate(B_transformed = (B * 10^9) / (4.6 * 10^6))
 
-normalized_card_data <- as.data.frame(card_length_SSU_norm) %>%
-  mutate(GENE = rownames(card_length_SSU_norm)) %>%
+# Normalize with transformed B values
+card_length_norm_t <- t(card_length_norm)
+card_length_norm_t <- sweep(card_length_norm_t, 1, combined_bases$B_transformed, FUN = "/")
+
+normalized_card <- t(card_length_norm_t)
+
+normalized_card_df <- as.data.frame(normalized_card) %>%
+  mutate(GENE = rownames(normalized_card)) %>%
   select(GENE, everything())
 
-long_card <- normalized_card_data %>%
+
+long_card <- normalized_card_df %>%
   pivot_longer(cols = -GENE, names_to = "SampleID", values_to = "Count")
 
 combined_data <- merge(long_card,metadata, by = "SampleID", all.x = TRUE)
