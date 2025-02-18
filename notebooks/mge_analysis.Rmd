@@ -31,20 +31,11 @@ MGE_data <- read.delim("MGE_genemat.txt", header = TRUE)
 MGE_lengths <- read.delim("MGE_lengths.txt", header = TRUE)
 ```
 
-#### Merging Metadata and Normalizing Counts using Metaxa
+#### Merging Metadata and Normalizing Counts
 
 ```{r}
-
-long_metaxa <- metaxa_data %>%
-  pivot_longer(cols = -Taxa, names_to = "SampleID", values_to = "Count")
-
-# Merge Metaxa data with metadata
-combined_metaxa <- merge(long_metaxa, metadata, by = "SampleID", all.x = TRUE)
 combined_length <- merge (MGE_data, MGE_lengths, by = "GENE", all.x = TRUE)
-
-ssu_counts <- combined_metaxa %>%
-  group_by(SampleID) %>%
-  summarize(SSU_Counts = sum(Count))
+combined_bases <- merge(number_bases, metadata, by = "SampleID", all.x = TRUE)
 
 rownames(combined_length) <- combined_length$GENE
 
@@ -55,30 +46,33 @@ MGE_length_norm <- combined_length[, 1:(ncol(combined_length)-1)]  / combined_le
 MGE_length_norm <- MGE_length_norm[ , order(names(MGE_length_norm))]
 
 
-# Normalization with Metaxa2 SSU counts
+# Modify the B column** (Multiply by 10^9, then divide by 4.6 x 10^6)
+combined_bases <- combined_bases %>%
+  mutate(B_transformed = (B * 10^9) / (4.6 * 10^6))
+
+# Normalize with transformed B values
 MGE_length_norm_t <- t(MGE_length_norm)
-ssu_counts <- ssu_counts %>% select(-SampleID)
-MGE_length_norm_t <- sweep(MGE_length_norm_t, 1, t(ssu_counts), FUN = "/")
-MGE_length_SSU_norm <- t(MGE_length_norm_t) * 1540
+MGE_length_norm_t <- sweep(MGE_length_norm_t, 1, combined_bases$B_transformed, FUN = "/")
 
-row.names(MGE_length_SSU_norm)
+normalized_MGE <- t(MGE_length_norm_t)
 
-normalized_MGE_data <- as.data.frame(MGE_length_SSU_norm) %>%
-  mutate(GENE = rownames(MGE_length_SSU_norm)) %>%
+normalized_MGE_df <- as.data.frame(normalized_MGE) %>%
+  mutate(GENE = rownames(normalized_MGE)) %>%
   select(GENE, everything())
 
-long_MGE <- normalized_MGE_data %>%
+
+long_MGE <- normalized_MGE_df %>%
   pivot_longer(cols = -GENE, names_to = "SampleID", values_to = "Count")
 
 combined_data <- merge(long_MGE,metadata, by = "SampleID", all.x = TRUE)
 print(combined_data)
 
 
+
 MGE_df <- combined_data %>%
   pivot_wider(names_from = GENE, values_from = Count)
 
 print(MGE_df)
-
 
 ```
 
