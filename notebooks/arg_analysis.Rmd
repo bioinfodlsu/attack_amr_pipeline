@@ -27,11 +27,10 @@ library(tidyverse)
 
 ```{r}
 metadata <- read.csv("metadata.csv", header = TRUE)
-metaxa_data <- read.delim("metaxa_genus.txt", header = TRUE)
 card_data_orig <- read.delim("ARG_genemat.txt", header = TRUE)
 drug_class_card_orig <- read.delim("card_drug_class.txt", header = TRUE)
 card_lengths_orig <- read.delim("card_length.txt", header = TRUE)
-
+number_bases <- read.csv("bases_number.csv", header = TRUE)
 ```
 
 #### Merging Metadata and Normalizing Counts

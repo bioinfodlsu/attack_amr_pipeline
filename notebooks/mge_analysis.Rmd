@@ -26,9 +26,9 @@ library(ggsignif)
 
 ```{r}
 metadata <- read.csv("metadata.csv", header = TRUE)
-metaxa_data <- read.delim("metaxa_genus.txt", header = TRUE)
 MGE_data <- read.delim("MGE_genemat.txt", header = TRUE)
 MGE_lengths <- read.delim("MGE_lengths.txt", header = TRUE)
+number_bases <- read.csv("bases_number.csv", header = TRUE)
 ```
 
 #### Merging Metadata and Normalizing Counts
