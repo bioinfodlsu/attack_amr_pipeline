@@ -5,3 +5,4 @@ channels:
 dependencies:
   - bowtie2 =2.5.1
   - samtools =1.16.1
+  - bioawk = 1.0
