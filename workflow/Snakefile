@@ -541,7 +541,7 @@ rule ISFinder_indexing:
 	threads: 20
 	shell:
 		"samtools index {input}"
-SAMPLE1 = "UST6"
+
 rule combine_ISFinder_results_1:
     input:
         "sorted_reads_ISFinder/{sample}.bam".format(sample=SAMPLES[0])
