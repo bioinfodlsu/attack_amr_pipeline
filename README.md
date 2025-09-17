@@ -1,9 +1,7 @@
 
-# Metagenomic and genomic surveillance of antimicrobial resistance in hospital wastewater (ATTACK-AMR) Analysis Pipeline
+# Investigating the resistome, bacterial composition, and mobilome in hospital wastewaters in Metro Manila using a shotgun metagenomics approach
 
-The cooperative research project ATTACK-AMR aims to deliver alternative, non-antibiotic therapies to combat antimicrobial resistant (AMR) pathogens. AMR is one of the biggest challenges facing healthcare industries and is on a rapid rise as
-a result of the overuse of antibiotics. Replacing antibiotics with alternative products will delay the resistance
-and restore the activity of antibiotics that are no longer effective due to resistance.
+This study provides an initial report of antibiotic resistance genes (ARGs), antibiotic resistant bacteria (ARBs), and mobile genetic elements (MGEs) in influent hospital wastewater (HWW) from three hospitals using shotgun metagenomic sequencing.
 
 
 This serves as a guide to run the analysis pipeline written in Snakemake.
@@ -59,34 +57,30 @@ $ git clone https://github.com/bioinfodlsu/attack_amr_pipeline
 ## 2. Quickstart Usage Guide
 
 ### 2.1. Input
-The pipeline requires, at the very least: (1) Metagenomic sequences (sample sequences can be downloaded at (tentative)), and (2) reference protein databases for ([CARD](https://card.mcmaster.ca/latest/data), [Kraken] (https://benlangmead.github.io/aws-indexes/k2) [MGE](https://github.com/KatariinaParnanen/MobileGeneticElementDatabase)). 
+The pipeline requires, at the very least: (1) Metagenomic sequences (sample sequences can be downloaded at (tentative)), and (2) reference databases for ([CARD](https://card.mcmaster.ca/latest/data), [Kraken2] (https://benlangmead.github.io/aws-indexes/k2), [ISFinder](https://isfinder.biotoul.fr/), [PlasmidFinder](https://bitbucket.org/genomicepidemiology/workspace/projects/DB) and [INTEGRALL](http://integrall.bio.ua.pt/)). 
 
-Note: For CARD, only the **nucleotide_fasta_protein_homolog_model.fasta** file was used. For Kraken, the Standard-16 Database was used for taxonomic analysis. CARD and MGE fasta files were renames as **card.fasta** and **MGE.fasta** respectively.
+Note: For CARD, only the **nucleotide_fasta_protein_homolog_model.fasta** file was used. For Kraken, the Standard-16 Database was used for taxonomic analysis. CARD and MGE fasta files were renamed as **card.fasta**,  **ISFinder.fasta**, **PlasmidFinder.fasta**, and **integrall.fasta** respectively.
 
-For Metaphlan, running 
-```
-$ metaphlan --install --bowtie2db /attack_amr_pipeline/metaphlan 
-```
-should download the latest database for you. It is a prerequisite to have Metaphlan installed locally using 
-```
-$ conda install -c bioconda metaphlan
-```
 
 All downloaded databases should be placed in the following directories:
 1. Metagenomic Sequences: **~/data**
 2. CARD: **~/card_db**
 3. Kraken: **~/kraken2_db**
-4. Metaphlan: **~/metaphlan**
-5. MGE: **~/MGE_db**
-
-
-These and other input parameters are specified via a YAML-format config file -- config.yaml is provided in the config folder. 
+4. ISFinder: **~/ISFinder_db**
+4. PlasmidFinder: **~/PlasmidFinder_db**
+4. INTEGRALL: **~/integrall_db**
+ 
 
 ### 2.2. Running the pipeline
-After constructing a config.yaml file and with the snakemake conda environment activated, you can call the pipeline from the top-level directory of ATTACK-AMR:
+With the snakemake conda environment activated, you can call the pipeline from the top-level directory of ATTACK-AMR:
 ```
 $ cd attack_amr_pipeline
 $ snakemake --use-conda --cores all
+```
+In case of errors encountered relating to the use of conda environments, please use the following command:
+```
+$ snakemake --use-conda --cores all --conda-frontend conda
+
 ```
 
 ### 2.3. Ouput
@@ -95,23 +89,26 @@ Outputs are stored the top-level directory of ATTACK-AMR. The following outputs 
 ARG (CARD):
 1. card_db/card_length.txt
 2. card_out/ARG_genemat.txt
-3. metaxa2/metaxa_genus.txt
 
-Taxonomic (Kraken and Metaphlan):
+Taxonomic (Kraken2):
 1. kreport2mpa_norm/merged_metakraken_abundance_table.txt
-2. metaphlan/merged_abundance_table.txt
 
 MGE
-1. MGE_db/MGE_length.txt
-2. MGE_out/MGE_genemat.txt
+1. ISFinder_db/IS_length.txt
+2. ISFinder_out/ISFinder_genemat.txt
+3. PlasmidFinder_db/PlasmidFinder_length.txt
+4. PlasmidFinder_out/PlasmidFinder_genemat.txt
+5. integrall_db/integrall_length.txt
+6. integrall_out/integrall_genemat.txt
+
 
 Before running the R analysis notebooks, it is ideal to place all of the above output files into one directory (the same directory where the R analysis notebooks are at).
 
 ### 2.4 Running the R analysis notebooks
 
-First download the metadata (metadata.csv) and CARD drug class information (card_drug_class.txt) before running the notebooks located in the repository.
+First download the metadata (metadata.csv), number of bases in the samples (bases_number.csv) and CARD drug class information (card_drug_class.txt) before running the notebooks located in the repository.
 
-Analysis scripts are made each for ARG analysis, Taxonomic analysis and MGE analysis. These are located in the notebooks folder in the repository. The notebooks are written in R used to produced data visualizations which include stacked bar plots, PCA plots and box plots for diversity analysis.
+Analysis scripts are made each for ARG analysis, Taxonomic analysis and MGE analysis. These are located in the notebooks folder in the repository. The notebooks are written in R used to produced data visualizations.
 
 Note that some library dependencies may need to be first installed through this command:
 
