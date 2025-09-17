@@ -57,7 +57,8 @@ $ git clone https://github.com/bioinfodlsu/attack_amr_pipeline
 ## 2. Quickstart Usage Guide
 
 ### 2.1. Input
-The pipeline requires, at the very least: (1) Metagenomic sequences (sample sequences can be downloaded at (tentative)), and (2) reference databases for ([CARD](https://card.mcmaster.ca/latest/data), [Kraken2] (https://benlangmead.github.io/aws-indexes/k2), [ISFinder](https://isfinder.biotoul.fr/), [PlasmidFinder](https://bitbucket.org/genomicepidemiology/workspace/projects/DB) and [INTEGRALL](http://integrall.bio.ua.pt/)). 
+The pipeline requires, at the very least: (1) Metagenomic sequences (sample sequences can be downloaded [here](*tentative*)), and (2) reference databases ([CARD](https://card.mcmaster.ca/latest/data), [Kraken2](https://benlangmead.github.io/aws-indexes/k2), [ISFinder](https://isfinder.biotoul.fr/), [PlasmidFinder](https://bitbucket.org/genomicepidemiology/workspace/projects/DB), and [INTEGRALL](http://integrall.bio.ua.pt/)).
+
 
 Note: For CARD, only the **nucleotide_fasta_protein_homolog_model.fasta** file was used. For Kraken, the Standard-16 Database was used for taxonomic analysis. CARD and MGE fasta files were renamed as **card.fasta**,  **ISFinder.fasta**, **PlasmidFinder.fasta**, and **integrall.fasta** respectively.
 
