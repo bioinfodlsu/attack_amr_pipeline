@@ -106,8 +106,11 @@ MGE
 Before running the R analysis notebooks, it is ideal to place all of the above output files into one directory (the same directory where the R analysis notebooks are at).
 
 ### 2.4 Running the R analysis notebooks
+Before running the notebooks in this repository, ensure you have prepared the following files for your samples:
 
-First download the metadata (metadata.csv), number of bases in the samples (bases_number.csv) and CARD drug class information (card_drug_class.txt) before running the notebooks located in the repository.
+1. **`metadata.csv`** – metadata describing your samples  
+2. **`bases_number.csv`** – number of bases in your samples  
+3. **`card_drug_class.txt`** – CARD drug class information with columns, Gene and Class
 
 Analysis scripts are made each for ARG analysis, Taxonomic analysis and MGE analysis. These are located in the notebooks folder in the repository. The notebooks are written in R used to produced data visualizations.
 
