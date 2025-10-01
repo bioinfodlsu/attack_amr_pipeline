@@ -110,7 +110,7 @@ Before running the notebooks in this repository, ensure you have prepared the fo
 
 1. **`metadata.csv`** – metadata describing your samples  
 2. **`bases_number.csv`** – number of bases in your samples  
-3. **`card_drug_class.txt`** – CARD drug class information with columns, Gene and Class
+3. **`card_drug_class.txt`** – CARD drug class information with columns, Gene and Class retrieved from [CARD website](https://card.mcmaster.ca/)
 
 Analysis scripts are made each for ARG analysis, Taxonomic analysis and MGE analysis. These are located in the notebooks folder in the repository. The notebooks are written in R used to produced data visualizations.
 
