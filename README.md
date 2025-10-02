@@ -84,7 +84,7 @@ $ snakemake --use-conda --cores all --conda-frontend conda
 
 ```
 
-### 2.3. Ouput
+### 2.3. Output
 Outputs are stored the top-level directory of ATTACK-AMR. The following outputs should be present. 
 
 ARG (CARD):
